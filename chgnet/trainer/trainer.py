@@ -246,6 +246,7 @@ class Trainer:
 #
 #            # val
 #            val_mae = self._validate(val_loader)
+            val_mae = 0.0 #SER change because input is needed for the function save_checkpoint
 #            for key in self.targets:
 #                self.training_history[key]["train"].append(train_mae[key])
 #                self.training_history[key]["val"].append(val_mae[key])
