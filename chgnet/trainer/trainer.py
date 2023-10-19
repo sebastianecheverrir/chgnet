@@ -246,7 +246,6 @@ class Trainer:
 #
 #            # val
 #            val_mae = self._validate(val_loader)
-            val_mae = 0.0 #SER change because input is needed for the function save_checkpoint
 #            for key in self.targets:
 #                self.training_history[key]["train"].append(train_mae[key])
 #                self.training_history[key]["val"].append(val_mae[key])
@@ -255,7 +254,10 @@ class Trainer:
 #                print("Exit due to NaN")
 #                break
 #
-            self.save_checkpoint(epoch, val_mae, save_dir=save_dir)
+#            self.save_checkpoint(epoch, val_mae, save_dir=save_dir)
+
+            #SER saving using the train error instead of the val error
+            self.save_checkpoint(epoch, train_mae, save_dir=save_dir)
 
         if test_loader is not None:
             # test best model
