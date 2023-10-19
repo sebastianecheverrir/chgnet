@@ -259,23 +259,26 @@ class Trainer:
             #SER saving using the train error instead of the val error
             self.save_checkpoint(epoch, train_mae, save_dir=save_dir)
 
-        if test_loader is not None:
-            # test best model
-            print("---------Evaluate Model on Test Set---------------")
-            for file in os.listdir(save_dir):
-                if file.startswith("bestE_"):
-                    best_checkpoint = torch.load(os.path.join(save_dir, file))
+#        SER commented these lines
+#        Not interested in testing, so no test model will be saved
 
-            self.model.load_state_dict(best_checkpoint["model"]["state_dict"])
-            if save_test_result:
-                test_mae = self._validate(
-                    test_loader, is_test=True, test_result_save_path=save_dir
-                )
-            else:
-                test_mae = self._validate(
-                    test_loader, is_test=True, test_result_save_path=None
-                )
-            self.training_history[key]["test"] = [test_mae[key] for key in self.targets]
+#        if test_loader is not None:
+#            # test best model
+#            print("---------Evaluate Model on Test Set---------------")
+#            for file in os.listdir(save_dir):
+#                if file.startswith("bestE_"):
+#                    best_checkpoint = torch.load(os.path.join(save_dir, file))
+#
+#            self.model.load_state_dict(best_checkpoint["model"]["state_dict"])
+#            if save_test_result:
+#                test_mae = self._validate(
+#                    test_loader, is_test=True, test_result_save_path=save_dir
+#                )
+#            else:
+#                test_mae = self._validate(
+#                    test_loader, is_test=True, test_result_save_path=None
+#                )
+#            self.training_history[key]["test"] = [test_mae[key] for key in self.targets]
 
     def _train(self, train_loader: DataLoader, current_epoch: int) -> dict:
         """Train all data for one epoch.
