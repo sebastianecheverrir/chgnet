@@ -498,9 +498,11 @@ class Trainer:
             mae_error (dict): dictionary that stores the MAEs
             save_dir (str): the directory to save trained weights
         """
-        for fname in os.listdir(save_dir):
-            if fname.startswith("epoch"):
-                os.remove(os.path.join(save_dir, fname))
+#        SER commented these lines 
+#           -to keep the models from each epoch
+#        for fname in os.listdir(save_dir):
+#            if fname.startswith("epoch"):
+#                os.remove(os.path.join(save_dir, fname))
 
         rounded_mae_e = round(mae_error["e"] * 1000)
         rounded_mae_f = round(mae_error["f"] * 1000)
