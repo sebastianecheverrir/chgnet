@@ -241,16 +241,19 @@ class Trainer:
                 print("Exit due to NaN")
                 break
 
-            # val
-            val_mae = self._validate(val_loader)
-            for key in self.targets:
-                self.training_history[key]["train"].append(train_mae[key])
-                self.training_history[key]["val"].append(val_mae[key])
-
-            if "e" in val_mae and val_mae["e"] != val_mae["e"]:
-                print("Exit due to NaN")
-                break
-
+#        SER commented these lines
+#        Not interested in validation, so no validation model will be saved
+#
+#            # val
+#            val_mae = self._validate(val_loader)
+#            for key in self.targets:
+#                self.training_history[key]["train"].append(train_mae[key])
+#                self.training_history[key]["val"].append(val_mae[key])
+#
+#            if "e" in val_mae and val_mae["e"] != val_mae["e"]:
+#                print("Exit due to NaN")
+#                break
+#
             self.save_checkpoint(epoch, val_mae, save_dir=save_dir)
 
         if test_loader is not None:
@@ -515,32 +518,35 @@ class Trainer:
         )
         self.save(filename=filename)
 
-        # save the model if it has minimal val energy error or val force error
-        if mae_error["e"] == min(self.training_history["e"]["val"]):
-            self.best_model = self.model
-            for fname in os.listdir(save_dir):
-                if fname.startswith("bestE"):
-                    os.remove(os.path.join(save_dir, fname))
-            shutil.copyfile(
-                filename,
-                os.path.join(
-                    save_dir,
-                    f"bestE_epoch{epoch}_e{rounded_mae_e}f{rounded_mae_f}"
-                    f"s{rounded_mae_s}m{rounded_mae_m}.pth.tar",
-                ),
-            )
-        if mae_error["f"] == min(self.training_history["f"]["val"]):
-            for fname in os.listdir(save_dir):
-                if fname.startswith("bestF"):
-                    os.remove(os.path.join(save_dir, fname))
-            shutil.copyfile(
-                filename,
-                os.path.join(
-                    save_dir,
-                    f"bestF_epoch{epoch}_e{rounded_mae_e}f{rounded_mae_f}"
-                    f"s{rounded_mae_s}m{rounded_mae_m}.pth.tar",
-                ),
-            )
+#        SER commented these lines
+#         Not interested in validation, so no validation model will be saved
+#
+#        # save the model if it has minimal val energy error or val force error
+#        if mae_error["e"] == min(self.training_history["e"]["val"]):
+#            self.best_model = self.model
+#            for fname in os.listdir(save_dir):
+#                if fname.startswith("bestE"):
+#                    os.remove(os.path.join(save_dir, fname))
+#            shutil.copyfile(
+#                filename,
+#                os.path.join(
+#                    save_dir,
+#                    f"bestE_epoch{epoch}_e{rounded_mae_e}f{rounded_mae_f}"
+#                    f"s{rounded_mae_s}m{rounded_mae_m}.pth.tar",
+#                ),
+#            )
+#        if mae_error["f"] == min(self.training_history["f"]["val"]):
+#            for fname in os.listdir(save_dir):
+#                if fname.startswith("bestF"):
+#                    os.remove(os.path.join(save_dir, fname))
+#            shutil.copyfile(
+#                filename,
+#                os.path.join(
+#                    save_dir,
+#                    f"bestF_epoch{epoch}_e{rounded_mae_e}f{rounded_mae_f}"
+#                    f"s{rounded_mae_s}m{rounded_mae_m}.pth.tar",
+#                ),
+#            )
 
     @classmethod
     def load(cls, path: str) -> Trainer:
