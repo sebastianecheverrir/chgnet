@@ -143,10 +143,13 @@ class Trainer:
             self.scheduler = ExponentialLR(self.optimizer, **scheduler_params)
             self.scheduler_type = "exp"
         elif scheduler in ["CosineAnnealingLR", "CosLR", "Cos", "cos"]:
+            #SER implementinc decay_fraction (like in the new version of CHG)
+            scheduler_params = kwargs.pop("scheduler_params", {"decay_fraction": 1e-2})
+            decay_fraction = scheduler_params.pop("decay_fraction")
             self.scheduler = CosineAnnealingLR(
                 self.optimizer,
                 T_max=10 * epochs,  # Maximum number of iterations.
-                eta_min=1e-2 * learning_rate,
+                eta_min = decay_fraction * learning_rate,
             )
             self.scheduler_type = "cos"
         elif scheduler in ["CosRestartLR"]:
