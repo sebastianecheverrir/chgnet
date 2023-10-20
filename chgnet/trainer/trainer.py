@@ -150,6 +150,7 @@ class Trainer:
                 self.optimizer,
                 T_max=10 * epochs,  # Maximum number of iterations.
                 eta_min = decay_fraction * learning_rate,
+                verbose=True,
             )
             self.scheduler_type = "cos"
         elif scheduler in ["CosRestartLR"]:
