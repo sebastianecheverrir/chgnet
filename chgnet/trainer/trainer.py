@@ -136,11 +136,11 @@ class Trainer:
                     "gamma": 0.3,
                 },
             )
-            self.scheduler = MultiStepLR(self.optimizer, **scheduler_params)
+            self.scheduler = MultiStepLR(self.optimizer, verbose=True, **scheduler_params)
             self.scheduler_type = "multistep"
         elif scheduler in ["ExponentialLR", "Exp", "Exponential"]:
             scheduler_params = kwargs.pop("scheduler_params", {"gamma": 0.98})
-            self.scheduler = ExponentialLR(self.optimizer, **scheduler_params)
+            self.scheduler = ExponentialLR(self.optimizer, verbose=True, **scheduler_params)
             self.scheduler_type = "exp"
         elif scheduler in ["CosineAnnealingLR", "CosLR", "Cos", "cos"]:
             #SER implementinc decay_fraction (like in the new version of CHG)
@@ -150,13 +150,13 @@ class Trainer:
                 self.optimizer,
                 T_max=10 * epochs,  # Maximum number of iterations.
                 eta_min = decay_fraction * learning_rate,
-                #verbose=True,
+                verbose=True,
             )
             self.scheduler_type = "cos"
         elif scheduler in ["CosRestartLR"]:
             scheduler_params = kwargs.pop("scheduler_params", {"T_0": 10, "T_mult": 2})
             self.scheduler = CosineAnnealingWarmRestarts(
-                self.optimizer, eta_min=1e-2 * learning_rate, **scheduler_params
+                self.optimizer, eta_min=1e-2 * learning_rate, verbose=True, **scheduler_params
             )
             self.scheduler_type = "cosrestart"
         else:
