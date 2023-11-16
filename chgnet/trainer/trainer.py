@@ -261,7 +261,9 @@ class Trainer:
 #            self.save_checkpoint(epoch, val_mae, save_dir=save_dir)
 
             #SER saving using the train error instead of the val error
-            self.save_checkpoint(epoch, train_mae, save_dir=save_dir)
+            #   save every 10 epochs
+            if not epoch%10:
+                self.save_checkpoint(epoch, train_mae, save_dir=save_dir)
 
 #        SER commented these lines
 #        Not interested in testing, so no test model will be saved
