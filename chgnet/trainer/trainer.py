@@ -19,7 +19,7 @@ from torch.optim.lr_scheduler import (
 )
 
 from chgnet.model.model import CHGNet
-from chgnet.utils import AverageMeter, cuda_devices_sorted_by_free_mem, mae, write_json
+from chgnet.utils import AverageMeter, cuda_devices_sorted_by_free_mem, mae, write_json, rmse
 
 if TYPE_CHECKING:
     from torch.utils.data import DataLoader
@@ -173,6 +173,17 @@ class Trainer:
             mag_loss_ratio=mag_loss_ratio,
             **kwargs,
         )
+
+        self.criterionRMSE = CombinedLossRMSE(
+            target_str=self.targets,
+            criterion=criterion,
+            is_intensive=self.model.is_intensive,
+            energy_loss_ratio=energy_loss_ratio,
+            force_loss_ratio=force_loss_ratio,
+            stress_loss_ratio=stress_loss_ratio,
+            mag_loss_ratio=mag_loss_ratio,
+            **kwargs,
+        
         self.epochs = epochs
         self.starting_epoch = starting_epoch
 
@@ -403,6 +414,124 @@ class Trainer:
             # compute output
             prediction = self.model(graphs, task=self.targets)
             combined_loss = self.criterion(targets, prediction)
+
+            losses.update(combined_loss["loss"].data.cpu().item(), len(graphs))
+            for key in self.targets:
+                mae_errors[key].update(
+                    combined_loss[f"{key}_MAE"].cpu().item(),
+                    combined_loss[f"{key}_MAE_size"],
+                )
+            if is_test and test_result_save_path:
+                for idx, graph_i in enumerate(graphs):
+                    tmp = {
+                        "mp_id": graph_i.mp_id,
+                        "graph_id": graph_i.graph_id,
+                        "energy": {
+                            "ground_truth": targets["e"][idx].cpu().detach().tolist(),
+                            "prediction": prediction["e"][idx].cpu().detach().tolist(),
+                        },
+                    }
+                    if "f" in self.targets:
+                        tmp["force"] = {
+                            "ground_truth": targets["f"][idx].cpu().detach().tolist(),
+                            "prediction": prediction["f"][idx].cpu().detach().tolist(),
+                        }
+                    if "s" in self.targets:
+                        tmp["stress"] = {
+                            "ground_truth": targets["s"][idx].cpu().detach().tolist(),
+                            "prediction": prediction["s"][idx].cpu().detach().tolist(),
+                        }
+                    if "m" in self.targets:
+                        if targets["m"][idx] is not None:
+                            m_ground_truth = targets["m"][idx].cpu().detach().tolist()
+                        else:
+                            m_ground_truth = None
+                        tmp["mag"] = {
+                            "ground_truth": m_ground_truth,
+                            "prediction": prediction["m"][idx].cpu().detach().tolist(),
+                        }
+                    test_pred.append(tmp)
+
+            # free memory
+            del graphs, targets
+            del prediction, combined_loss
+
+            # measure elapsed time
+            batch_time.update(time.perf_counter() - end)
+            end = time.perf_counter()
+
+            if (idx + 1) % self.print_freq == 0:
+                message = (
+                    f"Test: [{idx + 1}/{len(val_loader)}]\t"
+                    f"Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t"
+                    f"Loss {losses.val:.4f} ({losses.avg:.4f})  MAEs:  "
+                )
+                for key in self.targets:
+                    message += (
+                        f"{key} {mae_errors[key].val:.3f} ({mae_errors[key].avg:.3f})  "
+                    )
+                print(message)
+
+        if is_test:
+            message = "**  "
+            if test_result_save_path:
+                write_json(
+                    test_pred, os.path.join(test_result_save_path, "test_result.json")
+                )
+        else:
+            message = "*   "
+        for key in self.targets:
+            message += f"{key}_MAE ({mae_errors[key].avg:.3f}) \t"
+        print(message)
+        return {k: round(mae_error.avg, 6) for k, mae_error in mae_errors.items()}
+
+
+    def _validateRMSE(
+        self,
+        val_loader: DataLoader,
+        is_test: bool = False,
+        test_result_save_path: str | None = None,
+    ) -> dict:
+        """Validation or test step.
+
+        Args:
+            val_loader (DataLoader): val loader to test accuracy after each epoch
+            is_test (bool): whether it's test step
+            test_result_save_path (str): path to save test_result
+
+        Returns:
+            dictionary of training errors
+        """
+        batch_time = AverageMeter()
+        losses = AverageMeter()
+        mae_errors = {}
+        for key in self.targets:
+            mae_errors[key] = AverageMeter()
+
+        # switch to evaluate mode
+        self.model.eval()
+
+        if is_test:
+            test_pred = []
+
+        end = time.perf_counter()
+        for idx, (graphs, targets) in enumerate(val_loader):
+            if "f" in self.targets or "s" in self.targets:
+                for g in graphs:
+                    requires_force = "f" in self.targets
+                    g.atom_frac_coord.requires_grad = requires_force
+                graphs = [g.to(self.device) for g in graphs]
+                targets = {k: self.move_to(v, self.device) for k, v in targets.items()}
+            else:
+                with torch.no_grad():
+                    graphs = [g.to(self.device) for g in graphs]
+                    targets = {
+                        k: self.move_to(v, self.device) for k, v in targets.items()
+                    }
+
+            # compute output
+            prediction = self.model(graphs, task=self.targets)
+            combined_loss = self.criterionRMSE(targets, prediction)
 
             losses.update(combined_loss["loss"].data.cpu().item(), len(graphs))
             for key in self.targets:
@@ -718,6 +847,141 @@ class CombinedLoss(nn.Module):
                     mag_targets, mag_preds
                 )
                 out["m_MAE"] = mae(mag_targets, mag_preds)
+                out["m_MAE_size"] = m_MAE_size
+            else:
+                out["m_MAE"] = torch.zeros([1])
+                out["m_MAE_size"] = m_MAE_size
+
+        return out
+
+class CombinedLossRMSE(nn.Module):
+    """A combined loss function of energy, force, stress and magmom."""
+
+    def __init__(
+        self,
+        target_str: str = "ef",
+        criterion: str = "MSE",
+        is_intensive: bool = True,
+        energy_loss_ratio: float = 1,
+        force_loss_ratio: float = 1,
+        stress_loss_ratio: float = 0.1,
+        mag_loss_ratio: float = 0.1,
+        delta: float = 0.1,
+    ) -> None:
+        """Initialize the combined loss.
+
+        Args:
+            target_str: the training target label. Can be "e", "ef", "efs", "efsm" etc.
+                Default = "ef"
+            criterion: loss criterion to use
+                Default = "MSE"
+            is_intensive (bool): whether the energy label is intensive
+                Default = True
+            energy_loss_ratio (float): energy loss ratio in loss function
+                Default = 1
+            force_loss_ratio (float): force loss ratio in loss function
+                Default = 1
+            stress_loss_ratio (float): stress loss ratio in loss function
+                Default = 0.1
+            mag_loss_ratio (float): magmom loss ratio in loss function
+                Default = 0.1
+            delta (float): delta for torch.nn.HuberLoss. Default = 0.1
+        """
+        super().__init__()
+        # Define loss criterion
+        if criterion in ["MSE", "mse"]:
+            self.criterion = nn.MSELoss()
+        elif criterion in ["MAE", "mae", "l1"]:
+            self.criterion = nn.L1Loss()
+        elif criterion in ["Huber"]:
+            self.criterion = nn.HuberLoss(delta=delta)
+        else:
+            raise NotImplementedError
+        self.target_str = target_str
+        self.is_intensive = is_intensive
+        self.energy_loss_ratio = energy_loss_ratio
+        if "f" not in self.target_str:
+            self.force_loss_ratio = 0
+        else:
+            self.force_loss_ratio = force_loss_ratio
+        if "s" not in self.target_str:
+            self.stress_loss_ratio = 0
+        else:
+            self.stress_loss_ratio = stress_loss_ratio
+        if "m" not in self.target_str:
+            self.mag_loss_ratio = 0
+        else:
+            self.mag_loss_ratio = mag_loss_ratio
+
+    def forward(
+        self,
+        targets: dict[str, Tensor],
+        prediction: dict[str, Tensor],
+    ) -> dict[str, Tensor]:
+        """Compute the combined loss using CHGNet prediction and labels
+        this function can automatically mask out magmom loss contribution of
+        data points without magmom labels.
+
+        Args:
+            targets (dict): DFT labels
+            prediction (dict): CHGNet prediction
+
+        Returns:
+            dictionary of all the loss, MAE and MAE_size
+        """
+        out = {"loss": 0.0}
+        # Energy
+        if self.energy_loss_ratio != 0 and "e" in targets:
+            if self.is_intensive:
+                out["loss"] += self.energy_loss_ratio * self.criterion(
+                    targets["e"], prediction["e"]
+                )
+                out["e_MAE"] = rmse(targets["e"], prediction["e"])
+                out["e_MAE_size"] = prediction["e"].shape[0]
+            else:
+                e_per_atom_target = targets["e"] / prediction["atoms_per_graph"]
+                e_per_atom_pred = prediction["e"] / prediction["atoms_per_graph"]
+                out["loss"] += self.criterion(e_per_atom_target, e_per_atom_pred)
+                out["e_MAE"] = rmse(e_per_atom_target, e_per_atom_pred)
+                out["e_MAE_size"] = prediction["e"].shape[0]
+
+        # Force
+        if self.force_loss_ratio != 0 and "f" in targets:
+            forces_pred = torch.cat(prediction["f"], dim=0)
+            forces_target = torch.cat(targets["f"], dim=0)
+            out["loss"] += self.force_loss_ratio * self.criterion(
+                forces_target, forces_pred
+            )
+            out["f_MAE"] = rmse(forces_target, forces_pred)
+            out["f_MAE_size"] = forces_target.shape[0]
+
+        # Stress
+        if self.stress_loss_ratio != 0 and "s" in targets:
+            stress_pred = torch.cat(prediction["s"], dim=0)
+            stress_target = torch.cat(targets["s"], dim=0)
+            out["loss"] += self.stress_loss_ratio * self.criterion(
+                stress_target, stress_pred
+            )
+            out["s_MAE"] = rmse(stress_target, stress_pred)
+            out["s_MAE_size"] = stress_target.shape[0]
+
+        # Mag
+        if self.mag_loss_ratio != 0 and "m" in targets:
+            mag_preds, mag_targets = [], []
+            m_MAE_size = 0
+            for mag_pred, mag_target in zip(prediction["m"], targets["m"]):
+                # exclude structures without magmom labels
+                if mag_target is not None:
+                    mag_preds.append(mag_pred)
+                    mag_targets.append(mag_target)
+                    m_MAE_size += mag_target.shape[0]
+            if mag_targets != []:
+                mag_preds = torch.cat(mag_preds, dim=0)
+                mag_targets = torch.cat(mag_targets, dim=0)
+                out["loss"] += self.mag_loss_ratio * self.criterion(
+                    mag_targets, mag_preds
+                )
+                out["m_MAE"] = rmse(mag_targets, mag_preds)
                 out["m_MAE_size"] = m_MAE_size
             else:
                 out["m_MAE"] = torch.zeros([1])
