@@ -63,6 +63,21 @@ def mae(prediction: Tensor, target: Tensor) -> Tensor:
     return torch.mean(torch.abs(target - prediction))
 
 
+#####SER#####
+def rmse(prediction: Tensor, target: Tensor) -> Tensor:
+    """Computes the root mean square error between prediction and target.
+
+    Args:
+        prediction: Tensor (N, 1)
+        target: Tensor (N, 1).
+
+    Returns:
+        tensor
+    """
+    return torch.sqrt(torch.mean(torch.square(target - prediction)))
+############
+
+
 def read_json(fjson: str):
     """Read the json file.
 
