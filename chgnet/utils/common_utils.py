@@ -64,6 +64,7 @@ def mae(prediction: Tensor, target: Tensor) -> Tensor:
 
 
 #####SER#####
+
 def rmse(prediction: Tensor, target: Tensor) -> Tensor:
     """Computes the root mean square error between prediction and target.
 
@@ -75,6 +76,7 @@ def rmse(prediction: Tensor, target: Tensor) -> Tensor:
         tensor
     """
     return torch.sqrt(torch.mean(torch.square(target - prediction)))
+
 ############
 
 
