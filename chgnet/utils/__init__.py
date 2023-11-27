@@ -7,6 +7,7 @@ from chgnet.utils.common_utils import (
     mkdir,
     read_json,
     write_json,
+    rmse,
 )
 from chgnet.utils.vasp_utils import parse_vasp_dir, solve_charge_by_mag
 
@@ -19,4 +20,5 @@ __all__ = [
     "mkdir",
     "parse_vasp_dir",
     "solve_charge_by_mag",
+    "rmse" 
 ]
