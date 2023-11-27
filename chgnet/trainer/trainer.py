@@ -183,7 +183,7 @@ class Trainer:
             stress_loss_ratio=stress_loss_ratio,
             mag_loss_ratio=mag_loss_ratio,
             **kwargs,
-        
+        ) 
         self.epochs = epochs
         self.starting_epoch = starting_epoch
 
