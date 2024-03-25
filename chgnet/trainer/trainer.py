@@ -520,8 +520,8 @@ class Trainer:
 #            if fname.startswith("epoch"):
 #                os.remove(os.path.join(save_dir, fname))
 
-        rounded_mae_e = round(mae_error["e"] * 1000)
-        rounded_mae_f = round(mae_error["f"] * 1000)
+        rounded_mae_e = round(mae_error["e"] * 1000) if "e" in mae_error else "NA"
+        rounded_mae_f = round(mae_error["f"] * 1000) if "f" in mae_error else "NA"
         rounded_mae_s = round(mae_error["s"] * 1000) if "s" in mae_error else "NA"
         rounded_mae_m = round(mae_error["m"] * 1000) if "m" in mae_error else "NA"
         filename = os.path.join(
