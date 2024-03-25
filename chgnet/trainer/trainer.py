@@ -318,8 +318,8 @@ class Trainer:
 
             # compute output
             prediction = self.model(graphs, task=self.targets)
-            print(prediction['s'])
-            print(targets['s'])
+            #print(prediction['s'])
+            #print(targets['s'])
             
             combined_loss = self.criterion(targets, prediction)
 
