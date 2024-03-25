@@ -318,7 +318,9 @@ class Trainer:
 
             # compute output
             prediction = self.model(graphs, task=self.targets)
-            print(prediction)
+            print(prediction['s'])
+            print(targets['s'])
+            
             combined_loss = self.criterion(targets, prediction)
 
             losses.update(combined_loss["loss"].data.cpu().item(), len(graphs))
