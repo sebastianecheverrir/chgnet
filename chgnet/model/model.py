@@ -479,7 +479,7 @@ class CHGNet(nn.Module):
             )
             # Convert Stress unit from eV/A^3 to GPa
             scale = 1 / g.volumes * 160.21766208
-            print(g.volumes)
+            # print(g.volumes)
             stress = [i * j for i, j in zip(stress, scale)]
             prediction["s"] = stress
 
